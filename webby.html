@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>HTML Template Editor</title>
+  <style>
+    body { font-family: sans-serif; }
+    #editor-frame { width: 100%; height: 600px; border: 1px solid #aaa; }
+    #controls { margin-bottom: 1em; }
+    #toolbar {
+      display: none;
+      position: absolute;
+      background: #fff;
+      border: 1px solid #bbb;
+      box-shadow: 0 2px 6px #0002;
+      padding: 4px;
+      z-index: 9999;
+      border-radius: 5px;
+      user-select: none;
+      min-width: 320px;
+    }
+    #toolbar button, #toolbar select, #toolbar input[type="color"] {
+      background: none;
+      border: none;
+      margin: 0 2px;
+      font-size: 16px;
+      cursor: pointer;
+      padding: 3px 5px;
+      border-radius: 3px;
+      vertical-align: middle;
+    }
+    #toolbar button:hover { background: #eee; }
+    #toolbar input[type="color"] { width: 24px; height: 24px; }
+    .media-drop-hover { outline: 3px dashed #2a8cff; }
+    .link-edit-btn {
+      display: inline-block; margin-left: 4px; vertical-align: middle; cursor: pointer;
+      border-radius: 3px; background: #e7f3ff; border: 1px solid #89c9f7; font-size: 14px;
+      padding: 0 3px; color: #0366d6; transition: background 0.2s; position: relative; top: -1px;
+    }
+    .link-edit-btn:hover { background: #cce6ff; }
+    #cssModal, #linkModal, #altModal {
+      display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+      background: #0005; z-index: 10001; align-items: center; justify-content: center;
+    }
+    #cssModal > div, #linkModal > div, #altModal > div {
+      background: #fff; padding: 18px 28px; border-radius: 8px; min-width: 320px;
+      min-height: 120px; box-shadow: 0 4px 22px #0002;
+    }
+    #cssModal label, #linkModal label, #altModal label { display: block; margin-top: 10px; font-size: 14px; }
+    #cssModal input[type="text"], #cssModal select, #cssModal textarea,
+    #linkModal input, #altModal input {
+      width: 100%; margin-top: 3px; margin-bottom: 8px; font-size: 15px; padding: 4px;
+      border: 1px solid #ccc; border-radius: 3px; box-sizing: border-box;
+    }
+    #cssModal textarea { min-height: 60px; }
+  </style>
+</head>
+<body>
+<div id="controls">
+  <input type="file" id="fileInput" title="Open a local HTML file" accept=".html,.htm">
+  <button id="saveBtn" disabled title="Save your changes">Save HTML</button>
+  <button id="undoBtn" disabled title="Undo last action">Undo</button>
+  <button id="redoBtn" disabled title="Redo last undone action">Redo</button>
+  <button id="editBtn" disabled title="Edit the currently visible section">Edit Visible Section</button>
+  <button id="doneBtn" style="display:none;" title="Finish editing and return to view mode">Done Editing</button>
+  <button id="helpBtn" title="Open the user guide">?</button>
+</div>
+<iframe id="editor-frame"></iframe>
+<div id="toolbar">
+  <button title="Undo" id="tbUndoBtn">⎌</button>
+  <button title="Redo" id="tbRedoBtn">↻</button>
+  <button title="Bold" data-command="bold"><b>B</b></button>
+  <button title="Italic" data-command="italic"><i>I</i></button>
+  <button title="Underline" data-command="underline"><u>U</u></button>
+  <button title="Strikethrough" data-command="strikeThrough"><s>S</s></button>
+  <button title="Superscript" data-command="superscript">x<sup>2</sup></button>
+  <button title="Subscript" data-command="subscript">x<sub>2</sub></button>
+  <button title="Heading" data-command="formatBlock" data-value="H2">H2</button>
+  <button title="Ordered List" data-command="insertOrderedList">1.</button>
+  <button title="Unordered List" data-command="insertUnorderedList">&#8226;</button>
+  <button title="Blockquote" data-command="formatBlock" data-value="BLOCKQUOTE">❝</button>
+  <button title="Horizontal Line" data-command="insertHorizontalRule">―</button>
+  <button title="Align Left" data-command="justifyLeft">⬅️</button>
+  <button title="Align Center" data-command="justifyCenter">↔️</button>
+  <button title="Align Right" data-command="justifyRight">➡️</button>
+  <button title="Justify Full" data-command="justifyFull">⯀</button>
+  <input type="color" title="Text Color" id="textColorPicker">
+  <button title="Text Color" id="textColorBtn">A</button>
+  <input type="color" title="Highlight" id="bgColorPicker">
+  <button title="Highlight" id="bgColorBtn" style="background: yellow;">A</button>
+  <select id="fontSelect" title="Font Family">
+    <option value="">Font</option>
+    <option value="Arial">Arial</option>
+    <option value="Helvetica">Helvetica</option>
+    <option value="Times New Roman">Times New Roman</option>
+    <option value="Georgia">Georgia</option>
+    <option value="Courier New">Courier New</option>
+    <option value="monospace">Monospace</option>
+    <option value="Verdana">Verdana</option>
+  </select>
+  <select id="fontSizeSelect" title="Font Size">
+    <option value="">Size</option>
+    <option value="1">8pt</option>
+    <option value="2">10pt</option>
+    <option value="3">12pt</option>
+    <option value="4">14pt</option>
+    <option value="5">18pt</option>
+    <option value="6">24pt</option>
+    <option value="7">36pt</option>
+  </select>
+  <button id="cssBtn" title="Advanced CSS">🎨 CSS</button>
+</div>
+<div id="cssModal">
+  <div>
+    <h3 style="margin-top:0;">Style Element</h3>
+    <label>Padding <input id="cssPadding" type="text" placeholder="e.g. 10px 20px"></label>
+    <label>Margin <input id="cssMargin" type="text" placeholder="e.g. 5px 10px"></label>
+    <label>Text Align
+      <select id="cssTextAlign">
+        <option value="">(default)</option>
+        <option>left</option>
+        <option>center</option>
+        <option>right</option>
+        <option>justify</option>
+      </select>
+    </label>
+    <label>Background <input id="cssBg" type="color"></label>
+    <label>Text Color <input id="cssColor" type="color"></label>
+    <label>Font Family
+      <select id="cssFont">
+        <option value="">(default)</option>
+        <option value="Arial">Arial</option>
+        <option value="Helvetica">Helvetica</option>
+        <option value="Times New Roman">Times New Roman</option>
+        <option value="Georgia">Georgia</option>
+        <option value="Courier New">Courier New</option>
+        <option value="monospace">Monospace</option>
+        <option value="Verdana">Verdana</option>
+      </select>
+    </label>
+    <label>Font Size <input id="cssFontSize" type="text" placeholder="e.g. 16px"></label>
+    <label>Raw CSS <textarea id="cssRaw"></textarea></label>
+    <div style="margin-top:12px;text-align:right;">
+      <button id="cssResetBtn" style="color:#c00">Reset</button>
+      <button id="cssApplyBtn">Apply</button>
+      <button id="cssCancelBtn">Cancel</button>
+    </div>
+  </div>
+</div>
+<div id="linkModal">
+  <div>
+    <label>Edit Link URL:<br>
+      <input type="text" id="linkHrefInput" />
+    </label>
+    <label>Edit Link Text:<br>
+      <input type="text" id="linkTextInput" />
+    </label>
+    <div style="margin-top:10px;">
+      <button id="linkSaveBtn">Save</button>
+      <button id="linkRemoveBtn" style="color:#c00">Remove Link</button>
+      <button id="linkCancelBtn">Cancel</button>
+    </div>
+  </div>
+</div>
+<div id="altModal">
+  <div>
+    <label>Edit Alt Text:<br>
+      <input type="text" id="altInput" style="width:100%;" />
+    </label>
+    <div style="margin-top:10px; text-align:right;">
+      <button id="altSaveBtn">Save</button>
+      <button id="altCancelBtn">Cancel</button>
+    </div>
+  </div>
+</div>
+<script>
+const frame = document.getElementById('editor-frame');
+const toolbar = document.getElementById('toolbar');
+const fileInput = document.getElementById('fileInput');
+const saveBtn = document.getElementById('saveBtn');
+const undoBtn = document.getElementById('undoBtn');
+const redoBtn = document.getElementById('redoBtn');
+const tbUndoBtn = document.getElementById('tbUndoBtn');
+const tbRedoBtn = document.getElementById('tbRedoBtn');
+const textColorPicker = document.getElementById('textColorPicker');
+const bgColorPicker = document.getElementById('bgColorPicker');
+const textColorBtn = document.getElementById('textColorBtn');
+const bgColorBtn = document.getElementById('bgColorBtn');
+const fontSelect = document.getElementById('fontSelect');
+const fontSizeSelect = document.getElementById('fontSizeSelect');
+const cssBtn = document.getElementById('cssBtn');
+const cssModal = document.getElementById('cssModal');
+const cssPadding = document.getElementById('cssPadding');
+const cssMargin = document.getElementById('cssMargin');
+const cssTextAlign = document.getElementById('cssTextAlign');
+const cssBg = document.getElementById('cssBg');
+const cssColor = document.getElementById('cssColor');
+const cssFont = document.getElementById('cssFont');
+const cssFontSize = document.getElementById('cssFontSize');
+const cssRaw = document.getElementById('cssRaw');
+const cssApplyBtn = document.getElementById('cssApplyBtn');
+const cssCancelBtn = document.getElementById('cssCancelBtn');
+const cssResetBtn = document.getElementById('cssResetBtn');
+const linkModal = document.getElementById('linkModal');
+const linkHrefInput = document.getElementById('linkHrefInput');
+const linkTextInput = document.getElementById('linkTextInput');
+const linkSaveBtn = document.getElementById('linkSaveBtn');
+const linkRemoveBtn = document.getElementById('linkRemoveBtn');
+const linkCancelBtn = document.getElementById('linkCancelBtn');
+const altModal = document.getElementById('altModal');
+const altInput = document.getElementById('altInput');
+const altSaveBtn = document.getElementById('altSaveBtn');
+const altCancelBtn = document.getElementById('altCancelBtn');
+const editBtn = document.getElementById('editBtn');
+const doneBtn = document.getElementById('doneBtn');
+let editedEl = null, prevText = null, currentSelection = null, currentAltImg = null, currentLink = null, currentCssEl = null;
+let undoStack = [], redoStack = [];
+let currentPanel = null;
+
+function pushUndo(action) { undoStack.push(action); redoStack = []; updateUndoRedo(); }
+function popUndo() { if (!undoStack.length) return; const action = undoStack.pop(); redoStack.push(action); applyUndoAction(action, true); updateUndoRedo(); }
+function popRedo() { if (!redoStack.length) return; const action = redoStack.pop(); undoStack.push(action); applyUndoAction(action, false); updateUndoRedo(); }
+function applyUndoAction(action, undoing) {
+  if (action.type === "style") action.el.setAttribute("style", undoing ? (action.prevStyle||"") : (action.newStyle||""));
+  if (action.type === "buttonText") action.el.textContent = undoing ? action.prevText : action.newText;
+}
+function updateUndoRedo() {
+  undoBtn.disabled = redoBtn.disabled = tbUndoBtn.disabled = tbRedoBtn.disabled = false;
+  undoBtn.disabled = tbUndoBtn.disabled = !undoStack.length;
+  redoBtn.disabled = tbRedoBtn.disabled = !redoStack.length;
+}
+fileInput.addEventListener('change', function() {
+  const file = this.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    frame.srcdoc = e.target.result;
+    frame.onload = () => {
+      makeEditable();
+      editBtn.disabled = false;
+      doneBtn.style.display = 'none';
+      editBtn.style.display = '';
+      toolbar.style.display = 'none';
+    };
+    saveBtn.disabled = false;
+  };
+  reader.readAsText(file);
+});
+function makeEditable() {
+  // do nothing at first, only when edit mode is enabled
+}
+function enableEditMode() {
+  const doc = frame.contentDocument;
+  // Find all visible elements (not display:none, not visibility:hidden, not hidden attribute)
+  const all = Array.from(doc.body.getElementsByTagName("*"));
+  // Option 1: make all visible elements editable
+  all.forEach(el => {
+    const style = getComputedStyle(el);
+    if (
+      style.display !== "none" &&
+      style.visibility !== "hidden" &&
+      el.offsetParent !== null &&
+      !el.hasAttribute("hidden") &&
+      el.getClientRects().length
+    ) {
+      el.setAttribute("contenteditable", "true");
+      // Optionally: add border or highlight so user sees what is editable
+      el.style.outline = "1px dashed #4fc3f7";
+    }
+  });
+}
+function disableEditMode() {
+  const doc = frame.contentDocument;
+  Array.from(doc.querySelectorAll('[contenteditable="true"]')).forEach(el => {
+    el.removeAttribute("contenteditable");
+    el.style.outline = "";
+  });
+}
+
+editBtn.onclick = enableEditMode;
+doneBtn.onclick = disableEditMode;
+
+// Setup editable for only the current panel and its children
+function setupEditable(root) {
+  Array.from(root.querySelectorAll('*')).forEach(el => {
+    // Only enable editing logic for suitable elements
+    if (['SCRIPT','STYLE','LINK','META','HEAD','TITLE'].includes(el.tagName)) return;
+    // Button text editing
+    if (el.tagName === 'BUTTON') {
+      el.addEventListener('dblclick', function(e) {
+        e.stopPropagation(); e.preventDefault();
+        if (editedEl && editedEl !== el) editedEl.removeAttribute('contenteditable');
+        el.setAttribute('contenteditable','true'); el.focus(); editedEl = el; prevText = el.textContent; showToolbar(el);
+      });
+      el.addEventListener('focus', function() { prevText = el.textContent; });
+      el.addEventListener('blur', function() {
+        el.removeAttribute('contenteditable'); hideToolbar();
+        if (prevText !== undefined && prevText !== el.textContent)
+          pushUndo({type:"buttonText", el, prevText, newText:el.textContent});
+        prevText = undefined; editedEl = null;
+      });
+      el.addEventListener('keyup', saveSelection); el.addEventListener('mouseup', saveSelection);
+    }
+    // Link editing
+    else if (el.tagName === 'A') {
+      el.addEventListener('dblclick', function(e) {
+        e.stopPropagation(); e.preventDefault();
+        if (editedEl && editedEl !== el) editedEl.removeAttribute('contenteditable');
+        el.setAttribute('contenteditable','true'); el.focus(); editedEl = el; showToolbar(el);
+      });
+      el.addEventListener('blur', function() { el.removeAttribute('contenteditable'); hideToolbar(); editedEl = null; });
+      el.addEventListener('keyup', saveSelection); el.addEventListener('mouseup', saveSelection);
+      el.addEventListener('mouseenter', function() { removeLinkEditBtn(root.ownerDocument || root); addLinkEditBtn(root.ownerDocument || root, el); });
+      el.addEventListener('mouseleave', function() { setTimeout(()=>removeLinkEditBtn(root.ownerDocument || root),300); });
+    }
+    // Text nodes
+    else if (el.children.length === 0 && el.textContent.trim()) {
+      el.addEventListener('dblclick', function(e) {
+        e.stopPropagation(); e.preventDefault();
+        if (editedEl && editedEl !== el) editedEl.removeAttribute('contenteditable');
+        el.setAttribute('contenteditable','true'); el.focus(); editedEl = el; showToolbar(el);
+      });
+      el.addEventListener('blur', function() { el.removeAttribute('contenteditable'); hideToolbar(); editedEl = null; });
+      el.addEventListener('keyup', saveSelection); el.addEventListener('mouseup', saveSelection);
+    }
+    // Right click CSS modal
+    el.addEventListener('contextmenu', function(e) { e.preventDefault(); showCssModal(el); });
+    // Drag-drop for images/videos/icons
+    if (["IMG","VIDEO","SVG","I"].includes(el.tagName) || el.classList.contains("icon")) {
+      el.addEventListener('dragover', e=>{e.preventDefault(); el.classList.add('media-drop-hover');});
+      el.addEventListener('dragleave', e=>{e.preventDefault(); el.classList.remove('media-drop-hover');});
+      el.addEventListener('drop', function(e){
+        e.preventDefault(); el.classList.remove('media-drop-hover');
+        const file = e.dataTransfer.files[0]; if (!file) return;
+        if (el.tagName === "IMG" && file.type.startsWith("image/")) mediaReplaceFile(root.ownerDocument || root, el, file, "img");
+        if (el.tagName === "VIDEO" && file.type.startsWith("video/")) mediaReplaceFile(root.ownerDocument || root, el, file, "video");
+        if ((el.tagName === "SVG"||el.tagName === "I"||el.classList.contains("icon")) && (file.type==="image/svg+xml"||file.type.startsWith("image/")))
+          mediaReplaceFile(root.ownerDocument || root, el, file, "icon");
+      });
+      // Double-click image for replace/alt
+      if (el.tagName === "IMG") {
+        el.addEventListener('dblclick', function(e) { e.stopPropagation(); e.preventDefault(); showImageMenu(el, root.ownerDocument || root, e); });
+      }
+    }
+  });
+}
+function showToolbar(el) {
+  const rect = el.getBoundingClientRect(), iframeRect = frame.getBoundingClientRect();
+  toolbar.style.display = 'block';
+  let top = iframeRect.top+rect.top-toolbar.offsetHeight-6+window.scrollY, left = iframeRect.left+rect.left+window.scrollX;
+  if (top < 0) top = iframeRect.top+rect.bottom+5+window.scrollY;
+  if (left+toolbar.offsetWidth > window.innerWidth) left = window.innerWidth-toolbar.offsetWidth-10;
+  toolbar.style.top = `${top}px`; toolbar.style.left = `${left}px`;
+}
+function hideToolbar() { toolbar.style.display = 'none'; }
+function saveSelection() {
+  const doc = frame.contentDocument; try { currentSelection = doc.getSelection().getRangeAt(0); } catch {}
+}
+function restoreSelection() {
+  if (!currentSelection) return;
+  const doc = frame.contentDocument, sel = doc.getSelection();
+  sel.removeAllRanges(); sel.addRange(currentSelection);
+}
+toolbar.addEventListener('mousedown', function(e) {
+  e.preventDefault();
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  if (btn === tbUndoBtn) return popUndo();
+  if (btn === tbRedoBtn) return popRedo();
+  const command = btn.getAttribute('data-command');
+  let value = btn.getAttribute('data-value')||null;
+  frame.contentWindow.focus();
+  restoreSelection();
+  frame.contentDocument.execCommand(command, false, value);
+  saveSelection();
+});
+textColorBtn.addEventListener('mousedown', function(e) { e.preventDefault(); restoreSelection(); textColorPicker.click(); });
+textColorPicker.addEventListener('change', function() {
+  frame.contentWindow.focus(); restoreSelection();
+  frame.contentDocument.execCommand('foreColor', false, this.value); saveSelection();
+  if (editedEl) { const prevStyle = editedEl.getAttribute("style"); editedEl.style.color = this.value; pushUndo({type:"style", el:editedEl, prevStyle, newStyle:editedEl.getAttribute("style")}); }
+});
+bgColorBtn.addEventListener('mousedown', function(e) { e.preventDefault(); restoreSelection(); bgColorPicker.click(); });
+bgColorPicker.addEventListener('change', function() {
+  frame.contentWindow.focus(); restoreSelection();
+  frame.contentDocument.execCommand('hiliteColor', false, this.value); saveSelection();
+  if (editedEl) { const prevStyle = editedEl.getAttribute("style"); editedEl.style.backgroundColor = this.value; pushUndo({type:"style", el:editedEl, prevStyle, newStyle:editedEl.getAttribute("style")}); }
+});
+fontSelect.addEventListener('change', function() {
+  if (this.value && editedEl) {
+    frame.contentWindow.focus(); restoreSelection();
+    frame.contentDocument.execCommand('fontName', false, this.value); saveSelection();
+    const prevStyle = editedEl.getAttribute("style");
+    editedEl.style.fontFamily = this.value; pushUndo({type:"style", el:editedEl, prevStyle, newStyle:editedEl.getAttribute("style")});
+  }
+});
+fontSizeSelect.addEventListener('change', function() {
+  if (this.value && editedEl) {
+    frame.contentWindow.focus(); restoreSelection();
+    frame.contentDocument.execCommand('fontSize', false, this.value); saveSelection();
+    const prevStyle = editedEl.getAttribute("style");
+    editedEl.style.fontSize = ["8pt","10pt","12pt","14pt","18pt","24pt","36pt"][parseInt(this.value)-1]||'';
+    pushUndo({type:"style", el:editedEl, prevStyle, newStyle:editedEl.getAttribute("style")});
+  }
+});
+undoBtn.onclick = tbUndoBtn.onclick = popUndo;
+redoBtn.onclick = tbRedoBtn.onclick = popRedo;
+cssBtn.onclick = function() { if (editedEl) showCssModal(editedEl); };
+function showCssModal(el) {
+  currentCssEl = el;
+  cssPadding.value = el.style.padding||''; cssMargin.value = el.style.margin||'';
+  cssTextAlign.value = el.style.textAlign||''; cssBg.value = rgbToHex(el.style.backgroundColor)||'#ffffff';
+  cssColor.value = rgbToHex(el.style.color)||'#000000'; cssFont.value = el.style.fontFamily||'';
+  cssFontSize.value = el.style.fontSize||''; cssRaw.value = el.getAttribute('style')||'';
+  cssModal.style.display = 'flex';
+}
+cssApplyBtn.onclick = function() {
+  if (!currentCssEl) return;
+  const prevStyle = currentCssEl.getAttribute("style");
+  if (cssPadding.value) currentCssEl.style.padding = cssPadding.value; else currentCssEl.style.removeProperty('padding');
+  if (cssMargin.value) currentCssEl.style.margin = cssMargin.value; else currentCssEl.style.removeProperty('margin');
+  if (cssTextAlign.value) currentCssEl.style.textAlign = cssTextAlign.value; else currentCssEl.style.removeProperty('text-align');
+  if (cssBg.value) currentCssEl.style.backgroundColor = cssBg.value; else currentCssEl.style.removeProperty('background-color');
+  if (cssColor.value) currentCssEl.style.color = cssColor.value; else currentCssEl.style.removeProperty('color');
+  if (cssFont.value) currentCssEl.style.fontFamily = cssFont.value; else currentCssEl.style.removeProperty('font-family');
+  if (cssFontSize.value) currentCssEl.style.fontSize = cssFontSize.value; else currentCssEl.style.removeProperty('font-size');
+  if (cssRaw.value) currentCssEl.setAttribute('style', cssRaw.value);
+  pushUndo({type:"style", el:currentCssEl, prevStyle, newStyle:currentCssEl.getAttribute("style")});
+  cssModal.style.display = 'none'; currentCssEl = null;
+};
+cssCancelBtn.onclick = function() { cssModal.style.display = 'none'; currentCssEl = null; };
+cssResetBtn.onclick = function() {
+  if (!currentCssEl) return;
+  const prevStyle = currentCssEl.getAttribute("style");
+  currentCssEl.removeAttribute('style');
+  cssPadding.value = ''; cssMargin.value = ''; cssTextAlign.value = '';
+  cssBg.value = '#ffffff'; cssColor.value = '#000000'; cssFont.value = ''; cssFontSize.value = ''; cssRaw.value = '';
+  pushUndo({type:"style", el:currentCssEl, prevStyle, newStyle:""});
+};
+window.addEventListener('mousedown', function(e) {
+  if (!cssModal.contains(e.target) && cssModal.style.display === 'flex') { cssModal.style.display = 'none'; currentCssEl = null; }
+});
+function rgbToHex(rgb) {
+  if (!rgb) return '';
+  if (rgb[0] === '#') return rgb;
+  let res = rgb.match(/^rgb *\((\d+), *(\d+), *(\d+)\)$/);
+  if (!res) return '';
+  return '#' + ((1 << 24) + (parseInt(res[1]) << 16) + (parseInt(res[2]) << 8) + parseInt(res[3])).toString(16).slice(1);
+}
+function mediaReplaceFile(doc, el, file, type) {
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    if (type === 'img' || type === 'video') el.src = e.target.result;
+    else if (type === 'icon') {
+      if (file.name.endsWith('.svg') || file.type === 'image/svg+xml') {
+        const parser = new DOMParser(), svgDoc = parser.parseFromString(e.target.result, 'image/svg+xml'), newSvg = svgDoc.documentElement;
+        el.replaceWith(newSvg);
+      } else { const img = doc.createElement('img'); img.src = e.target.result; el.replaceWith(img); }
+    }
+  };
+  if (type === 'icon' && (file.name.endsWith('.svg') || file.type === 'image/svg+xml')) reader.readAsText(file);
+  else reader.readAsDataURL(file);
+}
+function showImageMenu(img, doc, event) {
+  const menu = doc.createElement('div');
+  menu.style.position = 'fixed';
+  menu.style.left = event.clientX + 'px';
+  menu.style.top = event.clientY + 'px';
+  menu.style.background = '#fff';
+  menu.style.border = '1px solid #bbb';
+  menu.style.zIndex = 10001;
+  menu.style.padding = '0';
+  menu.style.boxShadow = '0 2px 8px #0002';
+  menu.style.borderRadius = '6px';
+  menu.innerHTML = `
+    <button id="imgReplaceBtn" style="width:100%;padding:5px 10px;border:none;background:none;cursor:pointer;">Replace Image</button>
+    <button id="imgAltBtn" style="width:100%;padding:5px 10px;border:none;background:none;cursor:pointer;">Edit Alt Text</button>
+  `;
+  doc.body.appendChild(menu);
+  function removeMenu() { if (menu.parentNode) menu.parentNode.removeChild(menu); }
+  menu.querySelector('#imgReplaceBtn').onclick = function() { removeMenu(); showMediaUploadDialog(doc, img, 'image/*'); };
+  menu.querySelector('#imgAltBtn').onclick = function() { removeMenu(); showAltModal(img); };
+  setTimeout(() => {
+    doc.addEventListener('mousedown', function handler(e) {
+      if (!menu.contains(e.target)) { removeMenu(); doc.removeEventListener('mousedown', handler); }
+    });
+  }, 10);
+}
+function showAltModal(img) { altInput.value = img.getAttribute('alt') || ''; altModal.style.display = 'flex'; currentAltImg = img; }
+altSaveBtn.onclick = function() { if (currentAltImg) currentAltImg.setAttribute('alt', altInput.value); altModal.style.display = 'none'; currentAltImg = null; };
+altCancelBtn.onclick = function() { altModal.style.display = 'none'; currentAltImg = null; };
+function showMediaUploadDialog(doc, el, accept) {
+  const input = doc.createElement('input'); input.type = 'file'; input.accept = accept; input.style.display = 'none';
+  input.addEventListener('change', function() {
+    const file = this.files[0];
+    if (!file) return;
+    let type = 'img';
+    if (el.tagName === 'VIDEO') type = 'video';
+    if (el.tagName === 'SVG' || el.tagName === 'I' || el.classList.contains('icon')) type = 'icon';
+    mediaReplaceFile(doc, el, file, type);
+  });
+  doc.body.appendChild(input); input.click();
+  setTimeout(() => doc.body.removeChild(input), 1500);
+}
+function addLinkEditBtn(doc, linkEl) {
+  if (doc.getElementById('___linkEditBtn')) return;
+  const btn = doc.createElement('span');
+  btn.textContent = '✎'; btn.className = 'link-edit-btn'; btn.id = '___linkEditBtn';
+  linkEl.parentNode.insertBefore(btn, linkEl.nextSibling);
+  btn.addEventListener('mouseenter', () => {});
+  btn.addEventListener('mouseleave', () => { setTimeout(() => removeLinkEditBtn(doc), 300); });
+  btn.onclick = function(e) { e.preventDefault(); e.stopPropagation(); showLinkModal(linkEl, doc); };
+}
+function removeLinkEditBtn(doc) {
+  const btn = doc.getElementById('___linkEditBtn');
+  if (btn) btn.parentNode.removeChild(btn);
+}
+function showLinkModal(linkEl, doc) {
+  currentLink = linkEl;
+  linkHrefInput.value = linkEl.getAttribute('href') || '';
+  linkTextInput.value = linkEl.textContent || '';
+  linkModal.style.display = 'flex';
+  linkHrefInput.focus();
+}
+linkSaveBtn.onclick = function() {
+  if (currentLink) { currentLink.setAttribute('href', linkHrefInput.value); currentLink.textContent = linkTextInput.value; }
+  linkModal.style.display = 'none'; currentLink = null; removeLinkEditBtn(frame.contentDocument);
+};
+linkRemoveBtn.onclick = function() {
+  if (currentLink) {
+    const parent = currentLink.parentNode;
+    while (currentLink.firstChild) parent.insertBefore(currentLink.firstChild, currentLink);
+    parent.removeChild(currentLink);
+  }
+  linkModal.style.display = 'none'; currentLink = null; removeLinkEditBtn(frame.contentDocument);
+};
+linkCancelBtn.onclick = function() { linkModal.style.display = 'none'; currentLink = null; removeLinkEditBtn(frame.contentDocument); };
+saveBtn.onclick = function() {
+  const editedHTML = frame.contentDocument.documentElement.outerHTML;
+  const blob = new Blob([editedHTML], {type: 'text/html'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'edited_template.html'; a.click();
+  URL.revokeObjectURL(a.href);
+};
+</script>
+<div id="onboarding" style="display:none;position:fixed;top:20%;left:50%;transform:translateX(-50%);background:#fff;border:1px solid #aaa;padding:2em;z-index:9999;">
+  <h3>Welcome to the HTML Editor!</h3>
+  <ul>
+    <li><b>Open File:</b> Load your HTML file to start editing.</li>
+    <li><b>Edit Visible Section:</b> Click this after you navigate to the part you want to edit.</li>
+    <li><b>Toolbar:</b> Use formatting tools on selected text.</li>
+    <li><b>Save HTML:</b> Download your edited file.</li>
+  </ul>
+  <button onclick="document.getElementById('onboarding').style.display='none'">Got it!</button>
+</div>
+<script>
+window.onload = function() {
+  if (!localStorage.getItem('editorOnboarded')) {
+    document.getElementById('onboarding').style.display = 'block';
+    localStorage.setItem('editorOnboarded', '1');
+  }
+}
+document.getElementById('helpBtn').onclick = function() {
+  window.open('USER_GUIDE.md', '_blank');
+}
+</script>
+</body>
+</html>
+
